@@ -5,11 +5,18 @@ from __future__ import annotations
 from collections.abc import Iterable
 import logging
 from typing import Any
+from globalcache.abstract_remote import (
+    AbstractRemote,
+    CONF_MODADDR,
+    CONF_CONNADDR,
+    CONF_COMMANDS,
+    CONF_DATA,
+    CONF_IR_COUNT
+)
 
 import lirconian
 import voluptuous as vol
 
-from homeassistant.components import remote
 from homeassistant.components.remote import (
     ATTR_NUM_REPEATS,
     DEFAULT_NUM_REPEATS,
@@ -31,15 +38,8 @@ from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 _LOGGER = logging.getLogger(__name__)
 
 DEFAULT_PORT = 8765
-DEFAULT_TIMEOUT = 5000
-DEFAULT_COUNT = 1
-
-CONF_COMMANDS = "commands"
-CONF_DATA = "data"
-CONF_COUNT = "count"
-
-POWER_ON = "power_on"
-POWER_OFF = "power_off"
+DEFAULT_TIMEOUT = 2000
+DEFAULT_IR_COUNT = 1
 
 PLATFORM_SCHEMA = REMOTE_PLATFORM_SCHEMA.extend(
     {
@@ -52,14 +52,14 @@ PLATFORM_SCHEMA = REMOTE_PLATFORM_SCHEMA.extend(
                 {
                     vol.Optional(CONF_NAME): cv.string,
                     # TODO: transmitter
-                    vol.Optional(CONF_COUNT): cv.positive_int,
+                    vol.Optional(CONF_IR_COUNT): cv.positive_int,
                     vol.Required(CONF_COMMANDS): vol.All(
                         cv.ensure_list,
                         [
                             {
                                 vol.Required(CONF_NAME): cv.string,
-                                vol.Optional(CONF_COUNT): cv.positive_int,
-                                vol.Optional(CONF_DATA): cv.string, # ignored
+                                vol.Optional(CONF_IR_COUNT): cv.positive_int,
+                                vol.Optional(CONF_DATA): cv.string, # for compatibility, ignored
                             }
                         ],
                     ),
@@ -84,50 +84,17 @@ def setup_platform(
     devices = []
     for data in config[CONF_DEVICES]:
         name = data.get(CONF_NAME)
-        count = int(data.get(CONF_COUNT, DEFAULT_COUNT))
-        devices.append(LirconianRemote(lrc, name, count))
+        count = int(data.get(CONF_IR_COUNT, DEFAULT_IR_COUNT))
+        commands = []
+        for cmd in data.get(CONF_COMMANDS):
+            commands.append(cmd[CONF_NAME].strip())
+        devices.append(LirconianRemote(lrc, config[CONF_HOST], name, count, commands))
     add_entities(devices, True)
 
 
-class LirconianRemote(remote.RemoteEntity):
+class LirconianRemote(AbstractRemote):
     """Device that sends commands to an Lirconian device."""
 
-    def __init__(self, lirconian, name, count):
-        """Initialize device."""
-        self.lirconian = lirconian
-        self._power = False
-        self._name = name or DEVICE_DEFAULT_NAME
-        self._count = count or DEFAULT_COUNT
+    def __init__(self, lirconian, ip, name, count, commands):
+        super().__init(lirconian, ip, name, count, commands)
 
-    @property
-    def name(self):
-        """Return the name of the device."""
-        return self._name
-    
-    @property
-    def unique_id(self) -> str:
-        """Return a unique, Home Assistant friendly identifier for this entity."""
-        return 'lirc_client_' + self._name
-    
-    @property
-    def is_on(self):
-        """Return true if device is on."""
-        return self._power
-
-    def turn_on(self, **kwargs: Any) -> None:
-        """Turn the device on."""
-        self._power = True
-        self.send_command([ POWER_ON], ATTR_NUM_REPEATS=self._count)
-        self.schedule_update_ha_state()
-
-    def turn_off(self, **kwargs: Any) -> None:
-        """Turn the device off."""
-        self._power = False
-        self.send_command([ POWER_OFF ], ATTR_NUM_REPEATS=self._count)
-        self.schedule_update_ha_state()
-
-    def send_command(self, command: Iterable[str], **kwargs: Any) -> None:
-        """Send a command to one device."""
-        num_repeats = kwargs.get(ATTR_NUM_REPEATS, DEFAULT_NUM_REPEATS)
-        for single_command in command:
-            self.lirconian.send_ir_command(self._name, single_command, self._count * num_repeats)

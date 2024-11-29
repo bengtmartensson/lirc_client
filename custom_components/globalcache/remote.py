@@ -1,17 +1,20 @@
-"""Support for sending command to a TCP Lirc server using Lirconian."""
+"""Support for sending command to a Global Cache."""
 
 from __future__ import annotations
-
-from collections.abc import Iterable
+from .abstract_remote import (
+    AbstractRemote,
+    CONF_MODADDR,
+    CONF_CONNADDR,
+    CONF_COMMANDS,
+    CONF_DATA,
+    CONF_IR_COUNT
+)
 import logging
-from typing import Any
 
 import pyglobalcache
 import voluptuous as vol
-import base64
-#from . import const
 
-from homeassistant.components import remote
+#from homeassistant.components import remote
 from homeassistant.components.remote import (
     ATTR_NUM_REPEATS,
     DEFAULT_NUM_REPEATS,
@@ -23,7 +26,7 @@ from homeassistant.const import (
     CONF_NAME,
     CONF_PORT,
     CONF_TIMEOUT,
-    DEVICE_DEFAULT_NAME,
+#    DEVICE_DEFAULT_NAME,
 )
 from homeassistant.core import HomeAssistant
 import homeassistant.helpers.config_validation as cv
@@ -39,15 +42,6 @@ DEFAULT_TIMEOUT = 5000
 DEFAULT_IR_COUNT = 1
 DEFAULT_MODADDR = 1
 DEFAULT_CONNADDR = 1
-
-CONF_MODADDR = "modaddr"
-CONF_CONNADDR = "connaddr"
-CONF_COMMANDS = "commands"
-CONF_DATA = "data"
-CONF_IR_COUNT = "ir_count"
-
-POWER_ON = "power_on"
-POWER_OFF = "power_off"
 
 PLATFORM_SCHEMA = REMOTE_PLATFORM_SCHEMA.extend(
     {
@@ -104,56 +98,16 @@ def setup_platform(
         commands = {}
         for cmd in data.get(CONF_COMMANDS):
             cmdname = cmd[CONF_NAME].strip()
-            if not cmdname:
-                cmdname = '""'
             cmddata = cmd[CONF_DATA].strip()
-            if not cmddata:
-                cmddata = '""'
             commands[cmdname] = pyglobalcache.GCIRDevice.Command(cmddata)
-        devices.append(GlobalCacheRemote(globalCache, config[CONF_HOST], name, module, connaddr, count, commands))
+        devices.append(GlobalCacheRemote(globalCache, config[CONF_HOST], name, module, connaddr,
+                                          count, commands))
     add_entities(devices, True)
 
 
-class GlobalCacheRemote(remote.RemoteEntity):
+class GlobalCacheRemote(AbstractRemote):
     """Device that sends commands to a GlobalCache device."""
 
     def __init__(self, globalCache, ip, name, module, connaddr, count, commands):
-        """Initialize device."""
-        self._device = pyglobalcache.GCIRDevice(globalCache, module, connaddr, commands )
-        self._ip = ip
-        self._power = False
-        self._name = name or DEVICE_DEFAULT_NAME
-        self._count = count or DEFAULT_COUNT
-
-    @property
-    def name(self):
-        """Return the name of the device."""
-        return self._name
-    
-    @property
-    def unique_id(self) -> str:
-        """Return a unique, Home Assistant friendly identifier for this entity."""
-        return 'globalcache_' + base64.b64encode((self._ip + self._name).encode('utf-8')).decode('us-ascii')
-
-    @property
-    def is_on(self):
-        """Return true if device is on."""
-        return self._power
-
-    def turn_on(self, **kwargs: Any) -> None:
-        """Turn the device on."""
-        self._power = True
-        self.send_command([ POWER_ON], ATTR_NUM_REPEATS=self._count)
-        self.schedule_update_ha_state()
-
-    def turn_off(self, **kwargs: Any) -> None:
-        """Turn the device off."""
-        self._power = False
-        self.send_command([ POWER_OFF ], ATTR_NUM_REPEATS=self._count)
-        self.schedule_update_ha_state()
-
-    def send_command(self, command: Iterable[str], **kwargs: Any) -> None:
-        """Send a command to one device."""
-        num_repeats = kwargs.get(ATTR_NUM_REPEATS, DEFAULT_NUM_REPEATS)
-        for cmd in command:
-            self._device.send(cmd, self._count * num_repeats)
+        super().__init__(pyglobalcache.GCIRDevice(globalCache, module, connaddr, commands),
+                                ip, name, count, commands)
