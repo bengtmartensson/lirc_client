@@ -1,0 +1,17 @@
+{
+  "domain": "globalcache",
+  "name": "Global Cache",
+  "version": "0.0.1", 
+  "codeowners": [
+    "@bengtmartensson"
+  ],
+  "config_flow": false,
+  "dependencies": [],
+  "documentation": "https://github.com/bengtmartensson/lirc_client",
+  "homekit": {},
+  "iot_class": "assumed_state",
+  "requirements": [
+  ],
+  "ssdp": [],
+  "zeroconf": []
+}
