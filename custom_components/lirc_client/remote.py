@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 import logging
 from typing import Any
-from globalcache.abstract_remote import (
+from .abstract_remote import (
     AbstractRemote,
     CONF_MODADDR,
     CONF_CONNADDR,
@@ -96,5 +96,10 @@ class LirconianRemote(AbstractRemote):
     """Device that sends commands to an Lirconian device."""
 
     def __init__(self, lirconian, ip, name, count, commands):
-        super().__init(lirconian, ip, name, count, commands)
+        super().__init__(lirconian, ip, name, count, commands)
 
+    def send_command(self, command: Iterable[str], **kwargs: Any) -> None:
+        """Send a command to one device."""
+        num_repeats = kwargs.get(ATTR_NUM_REPEATS, DEFAULT_NUM_REPEATS)
+        for cmd in command:
+            self._hardware.send_ir_command(self._name, cmd, self._count * num_repeats)
