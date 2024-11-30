@@ -7,6 +7,8 @@ import logging
 from typing import Any
 from .abstract_remote import (
     AbstractRemote,
+    on_command,
+    off_command,
     CONF_MODADDR,
     CONF_CONNADDR,
     CONF_COMMANDS,
@@ -88,18 +90,21 @@ def setup_platform(
         commands = []
         for cmd in data.get(CONF_COMMANDS):
             commands.append(cmd[CONF_NAME].strip())
-        devices.append(LirconianRemote(lrc, config[CONF_HOST], name, count, commands))
+        devices.append(LirconianRemote(lrc, config[CONF_HOST], name, count, on_command(commands), off_command(commands)))
     add_entities(devices, True)
 
 
 class LirconianRemote(AbstractRemote):
     """Device that sends commands to an Lirconian device."""
 
-    def __init__(self, lirconian, ip, name, count, commands):
-        super().__init__(lirconian, ip, name, count, commands)
+    def __init__(self, lirconian, ip, name, count, on_command, off_command):
+        _LOGGER.info('Setting up Lirconian Remote on IP "%s" with name "%s", on="%s", off="%s"', ip, name, on_command, off_command)
+        super().__init__(lirconian, ip, name, count, on_command, off_command)
 
     def send_command(self, command: Iterable[str], **kwargs: Any) -> None:
         """Send a command to one device."""
         num_repeats = kwargs.get(ATTR_NUM_REPEATS, DEFAULT_NUM_REPEATS)
         for cmd in command:
-            self._hardware.send_ir_command(self._name, cmd, self._count * num_repeats)
+            count = self._count * num_repeats
+            _LOGGER.info("Sending command '%s' to remote '%s', count=%d", cmd, self._name, count)
+            self._hardware.send_ir_command(self._name, cmd, count)

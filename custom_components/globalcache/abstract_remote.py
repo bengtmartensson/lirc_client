@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
+import logging
 import base64
 
 from homeassistant.components import remote
@@ -24,10 +25,14 @@ CONF_DATA       = "data"
 CONF_IR_COUNT   = "ir_count"
 CONF_MODADDR    = "modaddr"
 CONF_CONNADDR   = "connaddr"
+CONF_ON_COMMAND  = "on_command"
+CONF_OFF_COMMAND = "off_command"
 
 POWER_ON_SYNONYMS = [ "power_on", "power on", "on" ]
 POWER_FALLBACKS = [ "power_toggle", "power toggle", "power", "key_power" ]                
 POWER_OFF_SYNONYMS = [ "power_off", "power off" "off", "standby" ]
+
+_LOGGER = logging.getLogger(__name__)
 
 def on_command(commands) -> str:
     return find_command_fallback(commands, POWER_ON_SYNONYMS, POWER_FALLBACKS)
@@ -50,14 +55,14 @@ def find_command(commands, vocabulary) -> str:
 class AbstractRemote(remote.RemoteEntity):
     """Abstract super class for device that sends commands to a remote."""
 
-    def __init__(self, hardware, ip, name, count, commands):
+    def __init__(self, hardware, ip, name, count, on_command, off_command):
         self._hardware = hardware
         self._ip = ip
         self._power = False
         self._name = name
         self._count = count
-        self._on_command = on_command(commands)
-        self._off_command = off_command(commands)
+        self._on_command = on_command
+        self._off_command = off_command
 
     @property
     def name(self) -> str:
@@ -90,4 +95,6 @@ class AbstractRemote(remote.RemoteEntity):
         """Send a command to one device."""
         num_repeats = kwargs.get(ATTR_NUM_REPEATS, DEFAULT_NUM_REPEATS)
         for cmd in command:
-            self._hardware.send(cmd, self._count * num_repeats)
+            count = self._count * num_repeats
+            _LOGGER.info("Sending command '%s' to remote '%s', count=%d", cmd, self._name, count)
+            self._hardware.send(cmd, count)

@@ -3,11 +3,15 @@
 from __future__ import annotations
 from .abstract_remote import (
     AbstractRemote,
+    on_command,
+    off_command,
     CONF_MODADDR,
     CONF_CONNADDR,
     CONF_COMMANDS,
     CONF_DATA,
-    CONF_IR_COUNT
+    CONF_IR_COUNT,
+    CONF_ON_COMMAND,
+    CONF_OFF_COMMAND,
 )
 import logging
 
@@ -63,7 +67,9 @@ PLATFORM_SCHEMA = REMOTE_PLATFORM_SCHEMA.extend(
                         [
                             {
                                 vol.Required(CONF_NAME): cv.string,
-                                vol.Optional(CONF_IR_COUNT): cv.positive_int,
+                                vol.Optional(CONF_IR_COUNT, default=DEFAULT_IR_COUNT): cv.positive_int,
+                                vol.Optional(CONF_ON_COMMAND, default=False): cv.boolean,
+                                vol.Optional(CONF_OFF_COMMAND, default=False): cv.boolean,   
                                 vol.Required(CONF_DATA): cv.string
                             }
                         ],
@@ -95,19 +101,30 @@ def setup_platform(
         count = int(data.get(CONF_IR_COUNT, DEFAULT_IR_COUNT))
         module = int(data.get(CONF_MODADDR, default_module))
         connaddr = int(data.get(CONF_CONNADDR, default_connaddr))
+        found_on_command = None
+        found_off_command = None
         commands = {}
         for cmd in data.get(CONF_COMMANDS):
             cmdname = cmd[CONF_NAME].strip()
             cmddata = cmd[CONF_DATA].strip()
+            if cmd[CONF_ON_COMMAND]:
+                found_on_command = cmdname
+            if cmd[CONF_OFF_COMMAND]:
+                found_off_command = cmdname
             commands[cmdname] = pyglobalcache.GCIRDevice.Command(cmddata)
+        if found_on_command is None:
+            found_on_command = on_command(commands)
+        if found_off_command is None:
+            found_off_command = off_command(commands)
         devices.append(GlobalCacheRemote(globalCache, config[CONF_HOST], name, module, connaddr,
-                                          count, commands))
+                                          count, commands, found_on_command, found_off_command))
     add_entities(devices, True)
 
 
 class GlobalCacheRemote(AbstractRemote):
     """Device that sends commands to a GlobalCache device."""
 
-    def __init__(self, globalCache, ip, name, module, connaddr, count, commands):
+    def __init__(self, globalCache, ip, name, module, connaddr, count, commands, on_command, off_command):
         super().__init__(pyglobalcache.GCIRDevice(globalCache, module, connaddr, commands),
-                                ip, name, count, commands)
+                                ip, name, count, on_command, off_command)
+        _LOGGER.info('Setting up GlobalCache Remote on IP "%s" with name "%s" on="%s" off="%s"', ip, name, on_command, off_command)
