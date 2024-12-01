@@ -19,19 +19,11 @@ from homeassistant.core import HomeAssistant
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
-
-CONF_COMMANDS   = "commands"
-CONF_DATA       = "data"
-CONF_IR_COUNT   = "ir_count"
-CONF_MODADDR    = "modaddr"
-CONF_CONNADDR   = "connaddr"
-CONF_ON_COMMAND  = "on_command"
-CONF_OFF_COMMAND = "off_command"
-
-POWER_ON_SYNONYMS = [ "power_on", "power on", "on" ]
-POWER_FALLBACKS = [ "power_toggle", "power toggle", "power", "key_power" ]                
-POWER_OFF_SYNONYMS = [ "power_off", "power off" "off", "standby" ]
-
+from .const import (
+    POWER_FALLBACKS,
+    POWER_OFF_SYNONYMS,
+    POWER_ON_SYNONYMS,
+)
 _LOGGER = logging.getLogger(__name__)
 
 def on_command(commands) -> str:
@@ -57,7 +49,7 @@ class AbstractRemote(remote.RemoteEntity):
 
     def __init__(self, hardware, ip, name, count, on_command, off_command):
         self._hardware = hardware
-        self._ip = ip
+        self._unique_id = __name__ + base64.b64encode((ip + name).encode('utf-8')).decode('us-ascii')
         self._power = False
         self._name = name
         self._count = count
@@ -72,7 +64,7 @@ class AbstractRemote(remote.RemoteEntity):
     @property
     def unique_id(self) -> str:
         """Return a unique, Home Assistant friendly identifier for this entity."""
-        return __name__ + base64.b64encode((self._ip + self._name).encode('utf-8')).decode('us-ascii')
+        return self._unique_id
 
     @property
     def is_on(self):

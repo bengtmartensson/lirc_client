@@ -1,5 +1,9 @@
 """Support for sending command to a TCP Lirc server using Lirconian."""
 
+# TODO:
+# * Implement transmitters (use connaddress)
+# * Implement on_command and off_command as per globalcache.
+
 from __future__ import annotations
 
 from collections.abc import Iterable
@@ -8,12 +12,18 @@ from typing import Any
 from .abstract_remote import (
     AbstractRemote,
     on_command,
-    off_command,
-    CONF_MODADDR,
+    off_command
+)
+
+from .const import (
     CONF_CONNADDR,
     CONF_COMMANDS,
     CONF_DATA,
-    CONF_IR_COUNT
+    CONF_IR_COUNT,
+    DEFAULT_PORT,
+    DEFAULT_TIMEOUT,
+    DEFAULT_IR_COUNT,
+    DEFAULT_CONNADDR
 )
 
 import lirconian
@@ -29,8 +39,7 @@ from homeassistant.const import (
     CONF_HOST,
     CONF_NAME,
     CONF_PORT,
-    CONF_TIMEOUT,
-    DEVICE_DEFAULT_NAME,
+    CONF_TIMEOUT
 )
 from homeassistant.core import HomeAssistant
 import homeassistant.helpers.config_validation as cv
@@ -39,9 +48,7 @@ from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
 _LOGGER = logging.getLogger(__name__)
 
-DEFAULT_PORT = 8765
-DEFAULT_TIMEOUT = 2000
-DEFAULT_IR_COUNT = 1
+
 
 PLATFORM_SCHEMA = REMOTE_PLATFORM_SCHEMA.extend(
     {
